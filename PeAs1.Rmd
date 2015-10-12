@@ -1,0 +1,46 @@
+---
+title: 'Repdata-033: Peer Assessment 1'
+author: "AAGP80"
+date: "12 ottobre 2015"
+output: html_document
+---
+
+## Requirements
+The following R packages are needed:
+```{r message=FALSE}
+require(lubridate)
+require(dplyr)
+require(ggplot2)
+options(scipen = 1)
+```
+
+## Loading and preprocessing the data
+It is supposed that activity.csv is in the same folder of this Rmd file.
+Data from activity.csv are loaded and dates are properly converted.
+```{r}
+activity<-read.csv("activity.csv",stringsAsFactors = FALSE)
+activity$date<-ymd(activity$date)
+```
+
+## What is mean total number of steps taken per day?
+In order to answer to this question, activity was grouped by date and it was calculated the total number of steps taken per day ignoring NA values.
+```{r}
+activity_by_date<-group_by(activity,date)
+tot_steps_by_date<-summarise(activity_by_date,number=sum(steps,na.rm=TRUE))
+```
+The following figure shows the distribution of the total number of steps taken each day
+```{r fig.width=5, fig.height=5, message=FALSE }
+ggplot(tot_steps_by_date, aes(x=number))+
+        geom_histogram()+
+        labs(title="Distribution of total number of steps",
+             x="Total number of steps",
+             y="Number of occurrence")+
+        theme_bw()
+```
+
+The following table summarize the mean and the median (rounded) of the previous distribution
+
+Stat. Quantity  | Value
+ ------------- | -------------
+ Mean          | `r round(mean(tot_steps_by_date$number),1)` 
+ Median        | `r round(median(tot_steps_by_date$number),1)`
