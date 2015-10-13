@@ -43,7 +43,7 @@ ggplot(tot_steps_by_date, aes(x=number))+
         geom_histogram()+
         labs(title="Distribution of total number of steps",
              x="Total number of steps",
-             y="Number of occurrence")+
+             y="Number of occurrences")+
         theme_bw()
 ```
 
@@ -63,7 +63,7 @@ activity_by_int<-group_by(activity,interval)
 avg_steps_by_int<-summarise(activity_by_int,avg=mean(steps,na.rm=TRUE))
 ```
 
-The following figure shows the average number of steps taken averaged across all days. The five minute acquisition intervals are to be read in the following way:
+The following figure shows the number of steps taken averaged across all days. The five minute acquisition intervals are to be read in the following way:
 
 * 0 = 00:00
 * 1000 = 10:00
@@ -72,7 +72,7 @@ The following figure shows the average number of steps taken averaged across all
 ```{r patternplot, fig.width=5, fig.height=5, message=FALSE }
 ggplot(avg_steps_by_int, aes(interval,avg))+
         geom_line()+
-        labs(title="Number of steps daily pattern",
+        labs(title="Typical (average) daily pattern",
              x="Interval",
              y="Average of total number of steps")+
         theme_bw()
@@ -84,18 +84,112 @@ Interval `r as.numeric(avg_steps_by_int[which.max(avg_steps_by_int$avg),1])` (i.
 ## Imputing missing values
 
 ```{r missingdata}
-tot_NA_by_date<-summarise(activity_by_date,NAnumber=sum(is.na(steps)))
+tot_NA_by_date<-summarise(activity_by_date,number.of.NA=sum(is.na(steps)))
 ```
 
 the following table shows that entire days are missing
 
 ```{r missingtable, results='asis'}
-xt<-filter(tot_NA_by_date,NAnumber!=0)
+xt<-filter(tot_NA_by_date,number.of.NA!=0)
 xt$date<-as.character(xt$date)
 xt<-xtable(xt)
-print(xt, type="html",include.rownames=FALSE)
+print(xt, type="html",include.rownames=FALSE, html.table.attributes = getOption("xtable.html.table.attributes","border=0"))
 ```
 
-The total number of NA values in the dataset is `r sum(tot_NA_by_date$NAnumber)`.
+The total number of NA values in the dataset is `r sum(tot_NA_by_date$number.of.NA)`.
 
-Since the presence of NA values may introduce bias into some calculations, ............
+Since the presence of NA values may introduce bias into some calculations, it was chosen to impute to missing values intervals the number of steps taken averaged across all days for that interval.
+As first step a new dataset is created: 
+```{r impute1}
+activity_imp<-activity
+```
+
+then missing values are imputed:
+
+```{r impute2}
+for (i in 1:nrow(activity_imp)) {
+         if (is.na(activity_imp$steps[i])) {
+                 activity_imp$steps[i] <- avg_steps_by_int[
+                         which(activity_imp$interval[i] == 
+                                       avg_steps_by_int$interval), ]$avg
+        }
+ }
+```
+
+As before the imputed dataset has been grouped by date and it was calculated the total number of steps taken per day
+
+```{r distribimputeddata}
+activity_imp_by_date<-group_by(activity_imp,date)
+tot_steps_imp_by_date<-summarise(activity_imp_by_date,
+                                 number=sum(steps))
+```
+
+after that a tidy dataset with the measured distribution and the imputed one is created
+
+```{r tidy}
+measured<-as.data.frame(tot_steps_by_date$number)
+measured$origin <- 'measured'
+names(measured)<-c("number","origin")
+
+imputed<-as.data.frame(tot_steps_imp_by_date$number)
+imputed$origin <- 'imputed'
+names(imputed)<-c("number","origin")
+
+combined<-rbind(measured, imputed)
+```
+
+This tidy dataset it is used for the distribution plot:
+
+```{r compdistribplot, fig.width=6.3, fig.height=5, message=FALSE }
+ggplot(combined, aes(x=number, fill=origin))+
+        geom_histogram(position="dodge")+
+        labs(title="Distribution of total number of steps",
+             x="Total number of steps",
+             y="Number of occurrences")+
+        theme_bw()
+```
+
+The following table summarize the mean and the median (rounded) of the previous distributions. The imputation affected both the mean and the median.
+
+Stat. Quantity  | Value before imputation | Value after imputation
+ ------------- | ------------- | -------------
+ Mean          | `r round(mean(tot_steps_by_date$number),1)` | `r round(mean(tot_steps_imp_by_date$number),1)`
+ Median        | `r round(median(tot_steps_by_date$number),1)` | `r round(median(tot_steps_imp_by_date$number),1)`
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+To answer to this question it was created a new factor variable in the imputed dataset with two levels – “weekday” and “weekend” 
+
+```{r factor}
+activity_imp<-mutate(activity_imp,
+                     weekfactor=ifelse(weekdays(date,abbreviate=TRUE)=="Lun" |
+                                    weekdays(date,abbreviate=TRUE)=="Mar" |
+                                    weekdays(date,abbreviate=TRUE)=="Mer" |
+                                    weekdays(date,abbreviate=TRUE)=="Gio" |
+                                    weekdays(date,abbreviate=TRUE)=="Ven",
+                                        "weekday","weekend")) %>%
+        mutate(weekfactor=as.factor(weekfactor))
+```
+
+then the dataset was grouped by weekfactor and interval. After that it was calculated the mean of the number of steps for each interval.
+
+```{r comparison}
+activity_imp_by_weekfactor_by_int<-group_by(activity_imp,weekfactor,interval)
+
+avg_steps_by_weekfactor_by_int<-summarise(activity_imp_by_weekfactor_by_int,
+                                     avg=mean(steps))
+````
+
+The following plot shows the comparison of activity pattern in weekday and weekend
+
+```{r compdpattern, fig.width=6.3, fig.height=5, message=FALSE }
+ggplot(avg_steps_by_weekfactor_by_int, aes(interval,avg))+
+        geom_line()+
+        facet_wrap(~weekfactor,ncol=1)+
+        labs(title="Typical (average) daily pattern",
+             x="Interval",
+             y="Average of total number of steps")+
+        theme_bw()
+```
+
+As it can be seen the activity in week day start earlier and after a peak before 10:00 reduces between around 20 and 100 steps per 5 minutes. On the other hand during weekend the activity begin later but is higher with values between around 50 and 150 steps per 5 minutes. 
