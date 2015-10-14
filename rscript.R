@@ -63,14 +63,14 @@ tot_NA_by_date<-summarise(activity_by_date,count=sum(is.na(steps)))
 rr<-filter(tot_NA_by_date,count!=0)
 ## deciso di imputare valore medio per intervallo a quell'intervallo
 
-avg_steps_by_int<-mutate(avg_steps_by_int,typical=avg)
+#avg_steps_by_int<-mutate(avg_steps_by_int,typical=avg)
 activity_imp<-activity
 
 for (i in 1:nrow(activity_imp)) {
          if (is.na(activity_imp$steps[i])) {
                  activity_imp$steps[i] <- avg_steps_by_int[
                          which(activity_imp$interval[i] == 
-                                       avg_steps_by_int$interval), ]$typical
+                                       avg_steps_by_int$interval), ]$avg
         }
  }
 
